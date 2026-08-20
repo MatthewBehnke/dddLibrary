@@ -1,0 +1,120 @@
+# go-arch-lint archfile — turns ADR 0001 (hexagonal ports & adapters) and the
+# vendor half of ADR 0002 (delivery-agnostic app layer) into a build-failing
+# check. Dependencies point inward: the domain knows nothing about adapters,
+# the app, or infrastructure frameworks.
+#
+# NOTE: go-arch-lint governs internal components and external (go.mod) vendors
+# only — it CANNOT restrict standard-library imports. The ADR 0002 rule that the
+# app layer must not import net/http (stdlib) is therefore enforced by
+# golangci-lint's depguard (see .golangci.yml); the pgx half of that rule is
+# enforced here via the vendor allowlist. See ADR 0003 for the rationale.
+version: 3
+
+# Analyse the whole module (both internal/ and cmd/).
+workdir: .
+
+allow:
+  # Force every component to whitelist the vendors it uses via canUse. This is
+  # what makes "domain may import only uuid" and "app may import no pgx"
+  # actually bite.
+  depOnAnyVendor: false
+  # deepScan (AST-level usage analysis, default on from schema v3+) is turned
+  # OFF here: at the composition root (cmd) it misreads legitimate dependency
+  # injection — passing postgres repositories into app.NewBorrowBook — as an
+  # adapter-postgres -> app dependency. Import-level checks already enforce the
+  # ADR 0001/0002 dependency rules cleanly, so we keep those and drop deepScan.
+  deepScan: false
+
+# The ADRs are about production dependencies; tests legitimately reach for
+# testify / httptest / testcontainers, so keep _test.go files out of scope.
+excludeFiles:
+  - "^.*_test\\.go$"
+
+vendors:
+  uuid:
+    in: github.com/google/uuid
+  pgx:
+    in:
+      - github.com/jackc/pgx/v5
+      - github.com/jackc/pgx/**
+  migrate:
+    in:
+      - github.com/golang-migrate/migrate/v4
+      - github.com/golang-migrate/migrate/**
+
+components:
+  domain:
+    in: internal/lending/domain
+  app:
+    in: internal/lending/app
+  adapter-rest:
+    in: internal/lending/adapters/rest
+  adapter-postgres:
+    in: internal/lending/adapters/postgres
+  adapter-memory:
+    in: internal/lending/adapters/memory
+  platform-config:
+    in: internal/platform/config
+  platform-migrate:
+    in: internal/platform/migrate
+  # The embedded SQL migrations are their own leaf package; the migrate runner
+  # reads them (ADR: "may use its embedded migrations").
+  migrations:
+    in: migrations
+  cmd:
+    in: cmd/server
+
+deps:
+  # Domain core: no internal dependencies, and only the uuid vendor.
+  domain:
+    canUse:
+      - uuid
+
+  # App use cases: the domain only. No vendors at all — this forbids pgx (and
+  # every other infra vendor) inside the app layer (ADR 0002).
+  app:
+    mayDependOn:
+      - domain
+
+  # Driving adapter: parses transport, calls use cases, maps domain errors.
+  adapter-rest:
+    mayDependOn:
+      - domain
+      - app
+
+  # Driven adapter: implements the domain repository ports over pgx.
+  adapter-postgres:
+    mayDependOn:
+      - domain
+    canUse:
+      - uuid
+      - pgx
+
+  # Driven adapter: in-memory repositories for fast tests / dev.
+  adapter-memory:
+    mayDependOn:
+      - domain
+
+  # Platform: env config loading — nothing internal, only stdlib (which
+  # go-arch-lint always permits), so it has no deps entry.
+
+  # Platform: embedded golang-migrate runner, over the migrate vendor and the
+  # embedded migrations package.
+  platform-migrate:
+    mayDependOn:
+      - migrations
+    canUse:
+      - migrate
+
+  # Composition root: wires everything together by hand.
+  cmd:
+    mayDependOn:
+      - domain
+      - app
+      - adapter-rest
+      - adapter-postgres
+      - adapter-memory
+      - platform-config
+      - platform-migrate
+    canUse:
+      - pgx
