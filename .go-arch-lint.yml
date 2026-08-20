@@ -41,6 +41,15 @@ vendors:
     in:
       - github.com/golang-migrate/migrate/v4
       - github.com/golang-migrate/migrate/**
+  # The transport-codegen vendors, isolated to the generated openapi package.
+  kin-openapi:
+    in:
+      - github.com/getkin/kin-openapi
+      - github.com/getkin/kin-openapi/**
+  oapi-runtime:
+    in:
+      - github.com/oapi-codegen/runtime
+      - github.com/oapi-codegen/runtime/**
 
 components:
   domain:
@@ -49,6 +58,8 @@ components:
     in: internal/lending/app
   adapter-rest:
     in: internal/lending/adapters/rest
+  adapter-rest-openapi:
+    in: internal/lending/adapters/rest/openapi
   adapter-postgres:
     in: internal/lending/adapters/postgres
   adapter-memory:
@@ -76,11 +87,22 @@ deps:
     mayDependOn:
       - domain
 
-  # Driving adapter: parses transport, calls use cases, maps domain errors.
+  # Driving adapter: implements the spec-generated interface, calls use cases,
+  # maps domain errors. Zero vendors of its own; it leans on the generated
+  # openapi package for the transport types and validator.
   adapter-rest:
     mayDependOn:
       - domain
       - app
+      - adapter-rest-openapi
+
+  # Generated transport boundary: the only place the codegen vendors live. The
+  # uuid dependency arrives through the generated uuid-typed DTO fields.
+  adapter-rest-openapi:
+    canUse:
+      - uuid
+      - kin-openapi
+      - oapi-runtime
 
   # Driven adapter: implements the domain repository ports over pgx.
   adapter-postgres:

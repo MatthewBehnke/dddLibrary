@@ -1,0 +1,15 @@
+# oapi-codegen configuration for the lending HTTP adapter.
+#
+# Strict-server mode over the standard-library net/http router, plus the
+# request/response models and the embedded spec (used by the validator
+# middleware). This is the only place the generated code and its dependency
+# footprint (oapi-codegen runtime, kin-openapi, uuid) live.
+package: openapi
+output: openapi.gen.go
+generate:
+  strict-server: true
+  std-http-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true

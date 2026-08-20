@@ -5,6 +5,7 @@ HTTP_ADDR    ?= :8080
 # drift. Bump these deliberately.
 GOLANGCI_LINT_VERSION ?= v2.13.0
 GO_ARCH_LINT_VERSION  ?= v1.17.0
+OAPI_CODEGEN_VERSION  ?= v2.8.0
 
 # Where `go install` drops tool binaries: it honors $GOBIN when set, and falls
 # back to $GOPATH/bin otherwise.
@@ -13,7 +14,7 @@ ifeq ($(GOBIN_DIR),)
 GOBIN_DIR := $(shell go env GOPATH)/bin
 endif
 
-.PHONY: help run build test test-integration vet fmt golangci arch-lint lint tidy tidy-check hooks-install pre-commit db-up db-down migrate-up migrate-down
+.PHONY: help run build test test-integration vet fmt golangci arch-lint lint tidy tidy-check generate generate-check hooks-install pre-commit db-up db-down migrate-up migrate-down
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -51,6 +52,13 @@ lint: golangci arch-lint ## Run all linters (golangci-lint + go-arch-lint)
 tidy-check: ## Fail if go.mod / go.sum are not tidy
 	go mod tidy
 	git diff --exit-code -- go.mod go.sum
+
+generate: ## Regenerate the OpenAPI server code from api/openapi.yaml (installs the pinned oapi-codegen)
+	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION)
+	PATH="$(GOBIN_DIR):$$PATH" go generate ./...
+
+generate-check: generate ## Fail if the committed generated code is stale versus the spec
+	git diff --exit-code -- internal/lending/adapters/rest/openapi
 
 hooks-install: ## Install the pre-commit git hooks
 	pre-commit install

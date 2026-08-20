@@ -1,0 +1,479 @@
+openapi: 3.0.3
+info:
+  title: Lending API
+  version: "1.0.0"
+  description: >-
+    The lending bounded context: who may borrow which physical Books and under
+    what rules. This document is the single source of truth for the HTTP
+    contract; the Go server is generated from it. Only Borrow (POST /loans) and
+    the liveness probe are wired today; every other operation is declared but
+    returns 501 Not Implemented until its slice is built.
+
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Liveness probe
+      tags: [ops]
+      responses:
+        "200":
+          description: The service is live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /loans:
+    post:
+      operationId: borrowBook
+      summary: Borrow a Book
+      description: A Member takes a Book on loan, creating a new active Loan.
+      tags: [loans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BorrowRequest"
+      responses:
+        "201":
+          description: The Book was borrowed; a new Loan was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BorrowResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      operationId: listLoans
+      summary: List Loans
+      tags: [loans]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of Loans.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoanList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /loans/{id}:
+    get:
+      operationId: getLoan
+      summary: Get a Loan by identifier
+      tags: [loans]
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The requested Loan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /loans/{id}/return:
+    post:
+      operationId: returnLoan
+      summary: Return a Loan
+      description: >-
+        End an active Loan as an explicit state transition. The Book becomes
+        available again while the Loan record is retained as history.
+      tags: [loans]
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The Loan was returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /books:
+    post:
+      operationId: createBook
+      summary: Create a Book
+      tags: [books]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookRequest"
+      responses:
+        "201":
+          description: The Book was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+    get:
+      operationId: listBooks
+      summary: List Books
+      tags: [books]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of Books.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /books/{id}:
+    get:
+      operationId: getBook
+      summary: Get a Book by identifier
+      tags: [books]
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The requested Book.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /members:
+    post:
+      operationId: createMember
+      summary: Create a Member
+      tags: [members]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMemberRequest"
+      responses:
+        "201":
+          description: The Member was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+    get:
+      operationId: listMembers
+      summary: List Members
+      tags: [members]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of Members.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /members/{id}:
+    get:
+      operationId: getMember
+      summary: Get a Member by identifier
+      tags: [members]
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The requested Member.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+components:
+  parameters:
+    PathID:
+      name: id
+      in: path
+      required: true
+      description: The resource identifier (UUID).
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return in one page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned by a previous page as next_cursor.
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: The request was malformed or violated the contract.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The request conflicts with the current resource state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnprocessableEntity:
+      description: The request was well-formed but a lending rule refused it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: An unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotImplemented:
+      description: The operation is declared but not yet implemented.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      description: The single error shape shared by every non-2xx response.
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: A human-readable description of what went wrong.
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    BorrowRequest:
+      type: object
+      required: [book_id, member_id]
+      properties:
+        book_id:
+          type: string
+          format: uuid
+          description: The Book to borrow.
+        member_id:
+          type: string
+          format: uuid
+          description: The Member borrowing the Book.
+
+    BorrowResult:
+      type: object
+      required: [loan_id, due_date]
+      properties:
+        loan_id:
+          type: string
+          description: The identifier of the newly created Loan (UUID).
+        due_date:
+          type: string
+          format: date-time
+          description: The instant by which the Book must be returned.
+
+    Book:
+      type: object
+      required: [id, title, available]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        available:
+          type: boolean
+          description: Whether the Book is currently free to borrow.
+
+    CreateBookRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    Member:
+      type: object
+      required: [id, name, status, active_loans]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/MembershipStatus"
+        active_loans:
+          type: integer
+          description: The Member's current active-Loan count.
+
+    MembershipStatus:
+      type: string
+      description: Whether a Member is currently entitled to borrow.
+      enum: [active, inactive]
+
+    CreateMemberRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    Loan:
+      type: object
+      required: [id, book_id, member_id, borrowed_at, due_date]
+      properties:
+        id:
+          type: string
+          format: uuid
+        book_id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        borrowed_at:
+          type: string
+          format: date-time
+        due_date:
+          type: string
+          format: date-time
+        returned_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the Loan was returned; null while still active.
+
+    BookList:
+      type: object
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Book"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page, or null when exhausted.
+
+    MemberList:
+      type: object
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+        next_cursor:
+          type: string
+          nullable: true
+
+    LoanList:
+      type: object
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Loan"
+        next_cursor:
+          type: string
+          nullable: true

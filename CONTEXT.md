@@ -42,3 +42,9 @@ _Avoid_: Quota, cap
 The act of a Member taking a Book on loan. It succeeds only when the membership
 is active, the Member is under the loan limit, and the Book is available.
 _Avoid_: Check out, take out, lend
+
+**Return**:
+The act of a Member giving back a borrowed Book. It ends the active Loan and
+makes the Book available again; the Loan record is retained as history rather
+than deleted.
+_Avoid_: Give back, check-in, cancel
