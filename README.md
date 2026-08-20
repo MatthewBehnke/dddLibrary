@@ -81,6 +81,53 @@ make test-integration  # pgx adapter against a throwaway Postgres (testcontainer
 
 Run `make help` for all targets.
 
+## Tooling / quality gate
+
+Quality is enforced by [`pre-commit`](https://pre-commit.com): on every
+`git commit` the full bar runs — `gofmt`, `go vet`, `golangci-lint`,
+`go-arch-lint`, a `go mod tidy` check, and the fast test suite. Each check is
+also a plain `make` target, so `pre-commit` is a thin adapter over them and you
+can run any check by hand. See
+[ADR 0003](docs/adr/0003-pre-commit-as-the-sole-quality-gate.md) for why this is
+the sole gate.
+
+### One-time setup
+
+Install the `pre-commit` binary out-of-band (it is not a Go tool):
+
+```sh
+brew install pre-commit      # macOS
+pipx install pre-commit      # or, cross-platform
+```
+
+Then register the git hooks:
+
+```sh
+make hooks-install   # runs `pre-commit install`
+```
+
+The Go linters (`golangci-lint`, `go-arch-lint`) are pinned and installed
+automatically via `go install` the first time their `make` target runs — no
+manual step needed.
+
+### Running the checks
+
+```sh
+make pre-commit   # run the whole bar across all files (no commit needed)
+
+make fmt          # gofmt -w (auto-format in place)
+make vet          # go vet
+make golangci     # golangci-lint only
+make arch-lint    # go-arch-lint only (ADR 0001/0002 boundaries)
+make lint         # both linters at once
+make tidy-check   # fail if go.mod / go.sum are not tidy
+make test         # fast suite
+```
+
+Every check runs over the whole module (`./...`), and the linter versions are
+pinned in the `Makefile`, so a fresh clone reaches an identical green bar. The
+checks work with or without `pre-commit` installed.
+
 ## Deliberate scope limits
 
 This is an outline, not a finished service. Known simplifications:

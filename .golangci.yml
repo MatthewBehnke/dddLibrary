@@ -1,0 +1,40 @@
+version: "2"
+
+# Keep the default linter set and add a small, curated set of extra
+# linters. Formatting is intentionally NOT owned here: `gofmt` (via
+# `make fmt`) is the single source of truth for formatting, so the
+# `formatters` section stays empty and the two tools cannot disagree.
+linters:
+  default: standard
+  enable:
+    - revive
+    - misspell
+    - gosec
+    # depguard enforces the half of ADR 0002 that go-arch-lint provably
+    # cannot: go-arch-lint never restricts standard-library imports, so the
+    # rule "the app layer must not import net/http" is enforced here instead.
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # ADR 0002: the app layer (use cases) is delivery-agnostic. The pgx
+        # ban is owned by go-arch-lint's vendor allowlist (app has no
+        # canUse); depguard only covers what go-arch-lint provably cannot —
+        # the stdlib net/http import.
+        app-no-transport:
+          files:
+            - "**/internal/lending/app/**"
+          deny:
+            - pkg: net/http
+              desc: "app is delivery-agnostic (ADR 0002); HTTP lives in adapters/rest"
+  exclusions:
+    # Drop the "exported symbol should have a comment" / "package should
+    # have a comment" noise. On this tracer-bullet outline that rule would
+    # demand a doc comment on every getter; documentation coverage is not
+    # what this gate is for. gofmt owns formatting; revive keeps its
+    # bug/style value without the comment nagging.
+    presets:
+      - comments
+
+formatters:
+  enable: []

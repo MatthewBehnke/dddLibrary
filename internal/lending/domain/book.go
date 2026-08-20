@@ -33,6 +33,3 @@ func (b *Book) markOnLoan() error {
 	b.available = false
 	return nil
 }
-
-// markReturned makes the Book available again.
-func (b *Book) markReturned() { b.available = true }
