@@ -48,6 +48,15 @@ repos:
         pass_filenames: false
         always_run: true
 
+      # Regenerate the OpenAPI server code and fail if it drifts from the
+      # committed output (mirrors tidy-check for the spec/codegen pair).
+      - id: generate-check
+        name: openapi generate check
+        entry: make generate-check
+        language: system
+        pass_filenames: false
+        always_run: true
+
       # Fast suite only. Docker-dependent integration tests and `make build`
       # are deliberately excluded from the hook.
       - id: test

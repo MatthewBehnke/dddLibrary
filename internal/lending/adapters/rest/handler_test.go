@@ -29,7 +29,11 @@ func newHarness(t *testing.T) harness {
 	uc := app.NewBorrowBook(books, members, loans, func() time.Time {
 		return time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	})
-	srv := httptest.NewServer(rest.NewRouter(rest.NewLoanHandler(uc)))
+	handler, err := rest.NewHandler(uc)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return harness{server: srv, books: books, members: members}
 }
@@ -153,5 +157,78 @@ func TestBorrow_statusMapping(t *testing.T) {
 				t.Fatalf("status = %d, want %d", resp.StatusCode, tc.wantCode)
 			}
 		})
+	}
+}
+
+// TestBorrow_validationErrorShape proves a spec-violating request is rejected
+// with 400 before any business logic runs, and that the validator's failure is
+// reshaped into the adapter's shared {"error": ...} body.
+func TestBorrow_validationErrorShape(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.postLoan(t, jsonBody("not-a-uuid", domain.NewMemberID().String()))
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+	var got struct {
+		Error string `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Error == "" {
+		t.Error("expected a non-empty error message in the shared error shape")
+	}
+}
+
+// TestUnimplementedOperation_returns501 proves a declared-but-unwired operation
+// (POST /books) returns 501 rather than fabricating a result, and honors the
+// shared error shape.
+func TestUnimplementedOperation_returns501(t *testing.T) {
+	h := newHarness(t)
+
+	resp, err := http.Post(h.server.URL+"/books", "application/json", strings.NewReader(`{"title":"SICP"}`))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	if resp.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want 501", resp.StatusCode)
+	}
+	var got struct {
+		Error string `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Error == "" {
+		t.Error("expected a non-empty error message in the shared error shape")
+	}
+}
+
+// TestHealthz_ok proves the liveness probe answers 200 through the real wiring
+// (it is modeled in-spec but needs no use case, so it is not a 501 stub).
+func TestHealthz_ok(t *testing.T) {
+	h := newHarness(t)
+
+	resp, err := http.Get(h.server.URL + "/healthz")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var got struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Status != "ok" {
+		t.Errorf("status = %q, want %q", got.Status, "ok")
 	}
 }

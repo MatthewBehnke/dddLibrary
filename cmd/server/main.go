@@ -63,11 +63,14 @@ func run(logger *slog.Logger) error {
 
 	borrow := app.NewBorrowBook(books, members, loans, time.Now)
 
-	router := rest.NewRouter(rest.NewLoanHandler(borrow))
+	handler, err := rest.NewHandler(borrow)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           router,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
