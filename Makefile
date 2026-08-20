@@ -6,6 +6,10 @@ HTTP_ADDR    ?= :8080
 GOLANGCI_LINT_VERSION ?= v2.13.0
 GO_ARCH_LINT_VERSION  ?= v1.17.0
 OAPI_CODEGEN_VERSION  ?= v2.8.0
+# Pin the migrate CLI to the same version as the in-process
+# golang-migrate/migrate/v4 dependency in go.mod so the CLI and the embedded
+# runner cannot drift.
+MIGRATE_VERSION       ?= v4.19.1
 
 # Where `go install` drops tool binaries: it honors $GOBIN when set, and falls
 # back to $GOPATH/bin otherwise.
@@ -75,8 +79,10 @@ db-up: ## Start the local Postgres via docker compose
 db-down: ## Stop and remove the local Postgres (and its volume)
 	docker compose down -v
 
-migrate-up: ## Apply migrations with the golang-migrate CLI
-	migrate -path migrations -database "$(DATABASE_URL)" up
+migrate-up: ## Apply migrations with the golang-migrate CLI (installs the pinned version)
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
+	$(GOBIN_DIR)/migrate -path migrations -database "$(DATABASE_URL)" up
 
-migrate-down: ## Roll back the last migration with the golang-migrate CLI
-	migrate -path migrations -database "$(DATABASE_URL)" down 1
+migrate-down: ## Roll back the last migration with the golang-migrate CLI (installs the pinned version)
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
+	$(GOBIN_DIR)/migrate -path migrations -database "$(DATABASE_URL)" down 1

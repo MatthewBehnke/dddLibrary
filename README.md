@@ -100,6 +100,13 @@ make run        # migrate on boot, then serve on :8080
 
 The server reads `DATABASE_URL` (required) and `HTTP_ADDR` (default `:8080`).
 
+`make run` applies migrations on boot, so the Quickstart needs no manual
+migration step. For explicit control, `make migrate-up` applies all outstanding
+migrations and `make migrate-down` rolls back the last one. Both self-install a
+pinned `golang-migrate` CLI via `go install` the first time they run — the
+version is pinned to the in-process `golang-migrate/migrate/v4` dependency, so
+there is no manual install step.
+
 ## Tests
 
 ```sh
